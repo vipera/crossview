@@ -16,12 +16,14 @@ firewall, NAT or some other obstacle. Both machines can access B, which is
 running an SSH server instance.
 
 A starts CrossView in server mode, sharing X session :0
-crossview -s -d 0 user@B
+
+`crossview -s -d 0 user@B`
 
 This creates a reverse tunnel from B to A that C can use after connecting to
 B via the client mode. The user of C is told the port number that has been
 reserved for traffic on B:
-crossview -c -p PORT_NO user@B
+
+`crossview -c -p PORT_NO user@B`
 
 This will open a VNC viewer for viewing and controlling the remote machine A.
 
