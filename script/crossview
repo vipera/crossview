@@ -1,0 +1,129 @@
+#!/usr/bin/env perl
+use warnings;
+use strict;
+
+use Getopt::Long;
+use Term::ReadPassword;
+use Data::Dumper;
+use FindBin qw($Bin);
+use lib "$Bin/../lib";
+
+use CrossView::Simple qw(
+    make_server make_client
+    kill_server
+);
+
+my $usage = <<"EOF";
+CrossView $CrossView::Simple::VERSION
+Usage: $0 [OPTIONS] [USER@]HOSTNAME
+Options:
+	-c             Client mode - connect to a remote desktop (default)
+	-s             Server mode - allow your desktop to be connected to
+	-i FILE        Identify with public key when connecting to SSH
+    -h
+    --help         Show program help
+    -v
+    --version      Show the version number
+
+	Client mode options:
+	-p PORT_NO     Port number on proxy host to connect to
+
+	Server mode options:
+	-d SESSION     X session to enable viewing of (usually '0' for current)
+EOF
+
+# process command-line flags and arguments
+my $server = 0;
+my $client = 0;
+my $remote_port = 0;
+my $display = 0;
+my $public_key_file = '';
+my $help = 0;
+my $version = 0;
+
+GetOptions(
+	'c'	  => \$client,
+	's'	  => \$server,
+	'p:i'	=> \$remote_port,
+	'd:i'	=> \$display,
+	'i:s'	=> \$public_key_file,
+	'h|help' => \$help,
+    'v|version' => \$version
+) or die $usage;
+
+if ($help) {
+	print $usage . "\n";
+	print <<"EOF";
+Enables a remote desktop to be viewed over a common SSH proxy. The machine to
+show its desktop first starts the program in 'server mode', establishing a
+connection to the proxy and forwarding a local port. A client wishing to connect
+should then launch the program in 'client mode', also connecting to the proxy
+and using the established tunnel to view the remote desktop.
+
+CrossView example uses:
+$0 -s -d 0 user\@someproxy.example.com
+	Server mode - initialize SSH connection to someproxy.example.com over which
+	VNC traffic will be routed.
+$0 -s -d 0 user:pass\@someproxy.example.com
+	Same example, explicitly specify password to use for login.
+$0 -s -d 0 localhost
+	Do not use proxy server, setup port for connecting to localhost (firewall
+	dependant).
+$0 -c -p 9000 user\@someproxy.example.com
+	Client mode - connect to proxy host and use port 9000 for VNC traffic. The
+	port number depends on what port the server forwarded.
+EOF
+	exit;
+}
+if ($version) {
+    print ((split /\n/, $usage)[0] . "\n");
+    exit;
+}
+
+unless ($#ARGV == 0) {
+	die "Too many parameters given where HOSTNAME was expected.\n$usage";
+}
+
+$client = !$server;
+
+# get connection string in format [USER[:PW]@]HOST[:PORT]
+my ($user, $password, $host, $port) =
+	$ARGV[0] =~ m/^(?:([^:@]*):?([^@]*)@)?([^:]+):?(\d*)/;
+
+if (!$password || $public_key_file) {
+	$password = read_password(
+		"Enter " . ($public_key_file ? "passphrase" : "password") . " for " .
+		($user ? $user . '@' : '') . "$host: ");
+}
+
+my $ssh_options = {
+	host	 => $host,
+	user	 => $user,
+	password => $password,
+	port	 => $port,
+	keyfile  => $public_key_file,
+};
+
+if ($server) {
+	make_server($display, $ssh_options);   
+}
+else {
+	make_client($remote_port, $ssh_options);
+}
+
+# run infinite loop while server / client is running, exit on appropriate signal
+my $run = 1;
+use sigtrap 'handler' => sub { $run = 0; }, qw(INT QUIT);
+
+while ($run) {
+    sleep 10;
+}
+
+# kill server / client
+print "Shutting down - killing " . ($server ? 'server' : 'client') . ".\n";
+if ($server) {
+    kill_server();
+}
+else {
+    
+}
