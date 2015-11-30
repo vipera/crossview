@@ -31,7 +31,7 @@ This will open a VNC viewer for viewing and controlling the remote machine A.
 
 ### Prerequisites ###
 
-Perl 5.014+
+Perl 5.6.x or higher with CPAN.
 
 Server mode requirements:
 - x11vnc
@@ -41,9 +41,10 @@ Client mode requirements:
 
 ### Installation instructions ###
 
-
+See INSTALL file for instructions.
 
 ## License ##
+
 This program is free software, licenced under the the BSD licence.
 Please see the COPYING file for additional information.
 

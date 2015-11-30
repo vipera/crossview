@@ -21,18 +21,28 @@ our @EXPORT_OK = qw(
 our $VERSION = '0.01';
 
 sub make_server {
-	my ($display, $ssh_options) = @_;
+	my ($display, $viewonly, $password, $ssh_options) = @_;
 
 	# start X11 VNC
-	my $x11vnc_port = int `x11vnc -nap -bg -forever -nopw \\
-		-desktop "VNC \${USER}@\${HOSTNAME}" -display :0 2>/dev/null \\
-		| grep -Eo "[0-9]{4}"`;
+	my $x11vnc_command = 'x11vnc ' .
+		($viewonly ? '-viewonly ' : '') .
+		($password ? "-passwd $password " : '-nopw ') .
+		'-nap -bg -forever -noxdamage -nolookup ' .
+		qq(-desktop "VNC \${USER}@\${HOSTNAME}" ) .
+		"-display :$display 2>/dev/null";
+	my $x11vnc_output = `$x11vnc_command`;
+
+	my ($x11vnc_port) = $x11vnc_output =~ m/([0-9]{4})/;
+	unless ($x11vnc_port) {
+		croak "Unable to start X11VNC.";
+	}
 
 	print "Started X11VNC server at localhost:$x11vnc_port\n";
 	
-	my $tunnel_port = 9000; # port on proxy machine to use (if necessary)
 	my $ssh = 0;
-
+	my $tunnel_port = 9000; # port on proxy machine
+	
+	my $try_ssh_options = $ssh_options;
 	# do not do SSH if target host is localhost (no proxy used)
 	unless ($ssh_options->{host} eq 'localhost') {
 		$ssh_options = {
@@ -41,22 +51,37 @@ sub make_server {
 
 			# reverse tunnel PORT:HOST:X11VNCPORT
 			reverse			=> 1,
-			local_port		=> $tunnel_port,
-			remote_host		=> $ssh_options->{host},
+			remote_host		=> 'localhost',
 			remote_port		=> $x11vnc_port,
 		};
 
 		for (; $tunnel_port < 10000; $tunnel_port++) {
+			# TODO: apparently ExitOnForwardFailure doesn't work on localhost
+			# tunnels. This is ugly, see if there's a better way.
+			my $try_ssh = ssh_connect(%$try_ssh_options);
+			my $port_error = $try_ssh->capture({ stderr_discard => 1 },
+				"netstat -lep --tcp | grep ':$tunnel_port'");
+			if (!$try_ssh) {
+				$ssh = $try_ssh;
+				last;
+			}
+			next if index($port_error, ":$tunnel_port") != -1;
+
+			# establish tunnel
+			$ssh_options->{local_port} = $tunnel_port;
 			$ssh = open_ssh_tunnel(%$ssh_options);
 
 			# break if error isn't 'port already used', otherwise try next port
-			last unless ($ssh->error &&
-				index($ssh->error, 'remote port forwarding failed') != -1);
+			last unless ($ssh->error && (
+				index($ssh->error, 'remote port forwarding failed') != -1 ||
+				index($ssh->error, 'control command failed') != -1));
+
 		}
 
 		if (!$ssh || $ssh->error) {
 			kill_server();
-			croak 'Could not connect to SSH server: ' . $ssh->error . "\n";
+			croak 'Could not connect to SSH server' .
+				($ssh ? ' (' . $ssh->error . ')' : '');
 		}
 	}
 
@@ -68,6 +93,9 @@ sub make_server {
 
 	print "Run crossview on client with the following options:\n";
 	print "$0 -c -p $tunnel_port [USER\@]$ssh_options->{host}\n";
+	print "Password: $password\n" if $password;
+
+	return { ssh => $ssh };
 }
 
 sub kill_server {
@@ -76,7 +104,7 @@ sub kill_server {
 }
 
 sub make_client {
-	my ($remote_port, $ssh_options) = @_;
+	my ($remote_port, $password, $ssh_options) = @_;
 
 	# get a random empty port
 	my $tunnel_port = empty_port();
@@ -102,24 +130,40 @@ sub make_client {
 		}
 	}
 
-	print "Initiating VNC viewer for remote session...\n";
+	print "Initiating VNC viewer for remote session over localhost:$tunnel_port...\n";
 	`vncviewer localhost:$tunnel_port 2>/dev/null`;
+
+	return { ssh => $ssh };
 }
 
 sub open_ssh_tunnel {
 	my %options = @_;
 
+	my $ssh = ssh_connect(
+		(%options,
+			opts => [
+				$options{reverse} ? '-R' : '-L' =>
+				"$options{local_port}:$options{remote_host}:$options{remote_port}"
+			]
+		)
+	);
+	return $ssh;
+}
+
+sub ssh_connect {
+	my %options = @_;
+
+	$options{opts} = [] unless $options{opts};
+
 	my %sshoptions = (
 		strict_mode => 0,
-		timeout => 3,
+		batch_mode => 1,
+		timeout => 30,
 		master_opts => [
 			# allow proxy to be unknown host
 			'-o' => 'StrictHostKeyChecking=no',
-			'-c' => 'blowfish',
-
-			# default to normal tunneling
-			$options{reverse} ? '-R' : '-L' =>
-				"$options{local_port}:$options{remote_host}:$options{remote_port}"
+			'-c' => 'blowfish-cbc',
+			@{$options{opts}}
 		],
 		# add other options (if defined)
 		map { $options{$_} ? ($_ => $options{$_}) : () }
@@ -136,7 +180,7 @@ sub open_ssh_tunnel {
 	}
 
 	# only add ExitOnForwardFailure option if requested
-	push $sshoptions{master_opts}, '-o' => 'ExitOnForwardFailure=yes'
+	push @{$sshoptions{master_opts}}, '-o' => 'ExitOnForwardFailure=yes'
 		if ($options{exitonfwdfail});
 
 	#print Dumper(\%sshoptions);

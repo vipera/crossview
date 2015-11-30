@@ -1,0 +1,23 @@
+CrossView
+
+INSTALLATION
+
+To install this module, run the following commands:
+
+	perl Build.PL
+
+You may be told by the previous command that there are dependencies you need to
+install in order to continue. If so, install them with:
+
+	./Build installdeps
+
+This should install any Perl modules that are required directly from CPAN.
+You should now proceed with the installation normally:
+
+	./Build
+	./Build install
+
+After that, crossview should be available as a command from /usr/bin or your
+default installation location:
+
+	crossview --version

@@ -1,0 +1,76 @@
+.\" Process this file with
+.\" groff -man -Tascii foo.1
+.\"
+.TH CROSSVIEW 1 "NOVEMBER 2015" Linux "User Manuals"
+.SH NAME
+crossview \- Wrapper for VNC over a common SSH host
+.SH SYNOPSIS
+.B crossview [-c] [-s] [-i] [-h|--help] [-v|--version] [-p
+.I port
+.B ] [-d
+.I X session
+.B ] [--password
+.I password
+.B ] [--viewonly] [
+.I user
+.B [:
+.I password
+.B ]@]
+.I host
+.B [:
+.I port
+.B ]
+.SH DESCRIPTION
+.B crossview
+allows a desktop X session to be shared via an SSH
+proxy server with another computer. First,
+.BR x11vnc (1)
+will be started. Using
+.BR ssh (1)
+a connection will be established towards another
+computer and the local port used for connecting to
+X11VNC will be forwarded. Another crossview user
+connecting to the SSH proxy can connect to the
+session, thereby bypassing any NAT or firewalls
+that would impede a direct connection.
+.SH OPTIONS
+.IP -s
+Start in server mode (share a desktop)
+.IP -c
+Start in client mode (connect to a desktop)
+.IP -i
+Use public key / passphrase authentication towards the
+SSH server instead of username/password.
+.IP -h, \-\-help
+Show program help
+..IP -v, \-\-version
+Show program version
+.IP -p
+Client mode only. Connect to specified forwarded port on
+proxy server. To
+connect to a different SSH port (not 22), use the
+hostname:port notation when specifying the SSH proxy's
+address.
+.IP -d
+Server mode only. Use the specified X session for
+displaying. The current
+desktop is usually 0 or 1, but this may vary depending
+on your settings.
+.IP --password
+Server mode only. Use the specified password for the VNC
+session. Provides
+additional security against people logged into the SSH
+proxy from viewing other sessions.
+.IP --viewonly
+Server mode only. Specify that a session is to be viewed
+only, with mouse and keyboard events not propagated to the
+target host.
+.SH BUGS
+A lot of varying X11VNC and SSH errors may not have been
+caught correctly.
+.SH AUTHOR
+Marin Rukavina <marin at shinyshell dot net>
+.SH "SEE ALSO"
+.BR ssh (1),
+.BR x11vnc (1),
+.BR vncviewer (1)

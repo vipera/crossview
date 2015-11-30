@@ -1,0 +1,10 @@
+Build.PL
+contributors.txt
+COPYING
+INSTALL
+bindoc/crossview.1.gz
+lib/CrossView/Simple.pm
+MANIFEST			This list of files
+README
+README.markdown
+script/crossview
