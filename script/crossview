@@ -31,7 +31,7 @@ Options:
     Server mode options:
     -d SESSION        X session to enable viewing of (usually '0' for current)
     --password PASSWD Use specified password for VNC server/client login.
-    --viewonly 		  Only allow viewing of session.
+    --viewonly           Only allow viewing of session.
 EOF
 
 # process command-line flags and arguments
@@ -46,20 +46,20 @@ my $vnc_password = '';
 my $viewonly = 0;
 
 GetOptions(
-	'c'	  => \$client,
-	's'	  => \$server,
-	'p:i'	=> \$remote_port,
-	'd:i'	=> \$display,
-	'i'	=> \$public_key_file,
-	'h|help' => \$help,
-    'v|version' => \$version,
+    'c'          => \$client,
+    's'          => \$server,
+    'p:i'        => \$remote_port,
+    'd:i'        => \$display,
+    'i'          => \$public_key_file,
+    'h|help'     => \$help,
+    'v|version'  => \$version,
     'password:s' => \$vnc_password,
-    'viewonly' => \$viewonly,
+    'viewonly'   => \$viewonly,
 ) or die $usage;
 
 if ($help) {
-	print $usage . "\n";
-	print <<"EOF";
+    print $usage . "\n";
+    print <<"EOF";
 Enables a remote desktop to be viewed over a common SSH proxy. The machine to
 show its desktop first starts the program in 'server mode', establishing a
 connection to the proxy and forwarding a local port. A client wishing to connect
@@ -68,18 +68,18 @@ and using the established tunnel to view the remote desktop.
 
 CrossView example uses:
 $0 -s -d 0 user\@someproxy.example.com
-	Server mode - initialize SSH connection to someproxy.example.com over which
-	VNC traffic will be routed.
+    Server mode - initialize SSH connection to someproxy.example.com over which
+    VNC traffic will be routed.
 $0 -s -d 0 user:pass\@someproxy.example.com
-	Same example, explicitly specify password to use for login.
+    Same example, explicitly specify password to use for login.
 $0 -s -d 0 localhost
-	Do not use proxy server, setup port for connecting to localhost (firewall
-	dependant).
+    Do not use proxy server, setup port for connecting to localhost (firewall
+    dependant).
 $0 -c -p 9000 user\@someproxy.example.com
-	Client mode - connect to proxy host and use port 9000 for VNC traffic. The
-	port number depends on what port the server forwarded.
+    Client mode - connect to proxy host and use port 9000 for VNC traffic. The
+    port number depends on what port the server forwarded.
 EOF
-	exit;
+    exit;
 }
 if ($version) {
     print ((split /\n/, $usage)[0] . "\n");
@@ -87,47 +87,47 @@ if ($version) {
 }
 
 unless ($#ARGV == 0) {
-	die "Too many parameters given where HOSTNAME was expected.\n$usage";
+    die "Too many parameters given where HOSTNAME was expected.\n$usage";
 }
 
 $client = !$server;
 
 # get connection string in format [USER[:PW]@]HOST[:PORT]
 my ($user, $password, $host, $port) =
-	$ARGV[0] =~ m/^(?:([^:@]*):?([^@]*)@)?([^:]+):?(\d*)/;
+    $ARGV[0] =~ m/^(?:([^:@]*):?([^@]*)@)?([^:]+):?(\d*)/;
 
 if (!$password || $public_key_file) {
-	$password = read_password(
-		"Enter " . ($public_key_file ? "passphrase" : "password") . " for " .
-		($user ? $user . '@' : '') . "$host: ");
+    $password = read_password(
+        "Enter " . ($public_key_file ? "passphrase" : "password") . " for " .
+        ($user ? $user . '@' : '') . "$host: ");
 }
 
 my $ssh_options = {
-	host	 => $host,
-	user	 => $user,
-	password => $password,
-	port	 => $port,
-	keyfile  => $public_key_file,
+    host     => $host,
+    user     => $user,
+    password => $password,
+    port     => $port,
+    keyfile  => $public_key_file,
 };
 
 my $connection = 0;
 
 if ($server) {
-	$connection = make_server($display, $viewonly, $vnc_password, $ssh_options);
+    $connection = make_server($display, $viewonly, $vnc_password, $ssh_options);
 
-	# server forever (until ctrl-c)
-	my $run = 1;
-	use sigtrap 'handler' => sub { $run = 0; }, qw(INT QUIT);
+    # server forever (until ctrl-c)
+    my $run = 1;
+    use sigtrap 'handler' => sub { $run = 0; }, qw(INT QUIT);
 
-	while ($run) {
-	    sleep 10;
-	}
+    while ($run) {
+        sleep 10;
+    }
 
-	print "Shutting down - killing " . ($server ? 'server' : 'client') . ".\n";
-	kill_server($connection);
+    print "Shutting down - killing " . ($server ? 'server' : 'client') . ".\n";
+    kill_server($connection);
 }
 else {
-	$connection = make_client($remote_port, $vnc_password, $ssh_options);
+    $connection = make_client($remote_port, $vnc_password, $ssh_options);
 }
 
 =pod
@@ -169,30 +169,30 @@ information or see the CrossView::Simple manual page.
 =head1 OPTIONS
 
 -s
-	Start in server mode (share a desktop)
+    Start in server mode (share a desktop)
 -c
-	Start in client mode (connect to a desktop)
+    Start in client mode (connect to a desktop)
 -i
-	Use public key / passphrase authentication towards the SSH server instead of
-	username/password.
+    Use public key / passphrase authentication towards the SSH server instead of
+    username/password.
 -h, --help
-	Show program help
+    Show program help
 -v, --version
-	Show program version
+    Show program version
 -p
-	Client mode only. Connect to specified forwarded port on proxy server. To
-	connect to a different SSH port (not 22), use the hostname:port notation
-	when specifying the SSH proxy's address.
+    Client mode only. Connect to specified forwarded port on proxy server. To
+    connect to a different SSH port (not 22), use the hostname:port notation
+    when specifying the SSH proxy's address.
 -d
-	Server mode only. Use the specified X session for displaying. The current
-	desktop is usually 0 or 1, but this may vary depending on your settings.
+    Server mode only. Use the specified X session for displaying. The current
+    desktop is usually 0 or 1, but this may vary depending on your settings.
 --password
-	Server mode only. Use the specified password for the VNC session. Provides
-	additional security against people logged into the SSH proxy from viewing
-	other sessions.
+    Server mode only. Use the specified password for the VNC session. Provides
+    additional security against people logged into the SSH proxy from viewing
+    other sessions.
 --viewonly
-	Server mode only. Specify that a session is to be viewed only, with mouse
-	and keyboard events not propagated to the target host.
+    Server mode only. Specify that a session is to be viewed only, with mouse
+    and keyboard events not propagated to the target host.
 
 =head1 INSTALLATION
 
