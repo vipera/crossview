@@ -7,8 +7,9 @@ a client and the exchange of VNC traffic via that connection.
 
 Usage:
 ```
-crossview [-c] [-s] [-i] [-h|--help] [-v|--version] [-p port] [-d X session]
-[--password password] [--viewonly] [user[:password]@]host[:port]
+crossview [-c] [-s] [-i] [-h|--help] [-v|--version] [-p port]
+    [-d X session] [--password password] [--viewonly]
+    [user[:password]@]host[:port]
 ```
 
 To start the server, specify a display to share and an SSH proxy over which to
@@ -65,21 +66,15 @@ This will open a VNC viewer for viewing and controlling the remote machine A.
 
 | Command-line switch | Description |
 | ------------------- | ----------- |
-| -s      | Start in server mode (share a desktop) |
-| -c      | Start in client mode (connect to a desktop) |
+| -s | Start in server mode (share a desktop) |
+| -c | Start in client mode (connect to a desktop) |
 | -i | Use public key / passphrase authentication towards the SSH server instead of username/password. |
 | -h, --help | Show program help |
 | -v, --version | Show program version |
-| -p | Client mode only. Connect to specified forwarded port on proxy server. To
-	connect to a different SSH port (not 22), use the hostname:port notation
-	when specifying the SSH proxy's address. |
-| -d | Server mode only. Use the specified X session for displaying. The current
-	desktop is usually 0 or 1, but this may vary depending on your settings. |
-| --password | Server mode only. Use the specified password for the VNC session. Provides
-	additional security against people logged into the SSH proxy from viewing
-	other sessions. |
-| --viewonly | Server mode only. Specify that a session is to be viewed only, with mouse
-	and keyboard events not propagated to the target host. |
+| -p | Client mode only. Connect to specified forwarded port on proxy server. To connect to a different SSH port (not 22), use the hostname:port notation when specifying the SSH proxy's address. |
+| -d | Server mode only. Use the specified X session for displaying. The current desktop is usually 0 or 1, but this may vary depending on your settings. |
+| --password | Server mode only. Use the specified password for the VNC session. Provides additional security against people logged into the SSH proxy from viewing other sessions. |
+| --viewonly | Server mode only. Specify that a session is to be viewed only, with mouse and keyboard events not propagated to the target host. |
 
 ## Installation ##
 
