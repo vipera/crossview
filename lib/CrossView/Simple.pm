@@ -3,79 +3,103 @@ package CrossView::Simple;
 # CrossView::Simple - a simple VNC/SSH client and server wrapper.
 # ------------------------------------------------------------------------------
 
-use strict;
 use warnings;
+use strict;
 
-use Carp;
-use Exporter qw(import);
+use Carp 			qw(carp croak);
+use Exporter 		qw(import);
+use Net::OpenSSH 	qw();
+use Net::EmptyPort 	qw(empty_port check_port);
+use IPC::Cmd        qw(can_run run);
 use Data::Dumper;
-
-use Net::OpenSSH;
-use Net::EmptyPort qw(empty_port check_port);
 
 #our @EXPORT = qw(make_server make_client kill_server); 
 our @EXPORT_OK = qw(
     make_server make_client
     kill_server
+    random_password
 );
-our $VERSION = '0.01';
+our $VERSION = '0.02';
+
+our @vnc_password_chars = ('A'..'Z', 'a'..'z', '1'..'9');
 
 sub make_server {
-    my ($display, $viewonly, $password, $ssh_options) = @_;
+	my %C = %{ shift() };
+
+    my $x11vnc_executable = can_run('x11vnc')
+        or croak 'X11VNC is not installed.';
+
+    # pick window if option was specified, but a concrete window ID wasn't set
+    if (!defined $C{windowid} && $C{pickwindow}) {
+        $C{windowid} = pick_window();
+    }
 
     # start X11 VNC
-    my $x11vnc_command = 'x11vnc ' .
-        ($viewonly ? '-viewonly ' : '') .
-        ($password ? "-passwd $password " : '-nopw ') .
+    my $x11vnc_command = "$x11vnc_executable " .
+        ($C{viewonly} ? '-viewonly ' : '') .
+        ($C{vnc_password} ? "-passwd $C{vnc_password} " : '-nopw ') .
         '-nap -bg -forever -noxdamage -nolookup ' .
         qq(-desktop "VNC \${USER}@\${HOSTNAME}" ) .
-        "-display :$display 2>/dev/null";
-    my $x11vnc_output = `$x11vnc_command`;
+        (defined $C{windowid} ? "-id $C{windowid} " : '') .
+        "-display :$C{display} 2>/dev/null";
 
+    my $x11vnc_output = `$x11vnc_command`;
     my ($x11vnc_port) = $x11vnc_output =~ m/([0-9]{4})/;
-    unless ($x11vnc_port) {
-        croak "Unable to start X11VNC.";
-    }
+    croak 'Unable to start X11VNC.' unless ($x11vnc_port);
 
     print "Started X11VNC server at localhost:$x11vnc_port\n";
     
-    my $ssh = 0;
-    my $tunnel_port = 9000; # port on proxy machine
+    my $ssh = undef;
+    my ($tunnel_port, $tunnel_max_port) = (9000, 10000); # port on proxy machine
     
-    my $try_ssh_options = $ssh_options;
     # do not do SSH if target host is localhost (no proxy used)
-    unless ($ssh_options->{host} eq 'localhost') {
-        $ssh_options = {
-            %$ssh_options, 
-            exitonfwdfail     => 1, # don't allow connection if port is used
-
-            # reverse tunnel PORT:HOST:X11VNCPORT
-            reverse            => 1,
-            remote_host        => 'localhost',
-            remote_port        => $x11vnc_port,
-        };
-
-        for (; $tunnel_port < 10000; $tunnel_port++) {
+    unless ($C{ssh_host} eq 'localhost') {
+        print "Establishing SSH tunnel to remote machine...\n";
+        for (; $tunnel_port < $tunnel_max_port; $tunnel_port++) {
             # TODO: apparently ExitOnForwardFailure doesn't work on localhost
             # tunnels. This is ugly, see if there's a better way.
-            my $try_ssh = ssh_connect(%$try_ssh_options);
-            my $port_error = $try_ssh->capture({ stderr_discard => 1 },
-                "netstat -lep --tcp | grep ':$tunnel_port'");
-            if (!$try_ssh) {
+            my $try_ssh = ssh_connect(
+            	host 		=> $C{ssh_host},
+                user        => $C{ssh_user},
+            	password 	=> $C{ssh_password},
+            	port 		=> $C{ssh_port},
+            	keyfile 	=> $C{key_file}
+            );
+            if (!$try_ssh || $try_ssh->error) {
                 $ssh = $try_ssh;
                 last;
             }
+            my $port_error = $try_ssh->capture({ stderr_discard => 1 },
+                "netstat -lep --tcp | grep ':$tunnel_port'");
             next if index($port_error, ":$tunnel_port") != -1;
 
             # establish tunnel
-            $ssh_options->{local_port} = $tunnel_port;
-            $ssh = open_ssh_tunnel(%$ssh_options);
+            $ssh = open_ssh_tunnel(
+            	host 			=> $C{ssh_host},
+                user            => $C{ssh_user},
+	        	password 		=> $C{ssh_password},
+	        	port 			=> $C{ssh_port},
+	        	keyfile 		=> $C{key_file},
+	            
+	            # don't allow connection if port is used
+	            exitonfwdfail 	=> 1,
+
+	            # reverse tunnel PORT:HOST:X11VNCPORT
+	            reverse 		=> 1,
+	            local_port 		=> $tunnel_port,
+	            remote_host 	=> 'localhost',
+	            remote_port 	=> $x11vnc_port,
+            );
 
             # break if error isn't 'port already used', otherwise try next port
             last unless ($ssh->error && (
                 index($ssh->error, 'remote port forwarding failed') != -1 ||
                 index($ssh->error, 'control command failed') != -1));
+        }
 
+        if ($tunnel_port > $tunnel_max_port) {
+        	croak 'Could not open port on proxy at this time - max number of ' .
+        		'connections established.';
         }
 
         if (!$ssh || $ssh->error) {
@@ -85,55 +109,93 @@ sub make_server {
         }
     }
 
-    # change localhost to something more explicit if no proxy is being used
-    if ($ssh_options->{host} eq 'localhost') {
-        $ssh_options->{host} = 'THIS_HOST';
-        $tunnel_port = $x11vnc_port;
-    }
-
     print "Run crossview on client with the following options:\n";
-    print "$0 -c -p $tunnel_port [USER\@]$ssh_options->{host}\n";
-    print "Password: $password\n" if $password;
+    print join(' ', (
+        "crossview -c",
+        '-p ' . ($C{ssh_host} eq 'localhost' ? $x11vnc_port : $tunnel_port),
+        defined $C{vnc_password} ? "--password $C{vnc_password}" : '',
+        $C{ssh_host} eq 'localhost' ?
+            'SSH_USER@THIS_HOST' :
+            make_connection_string(\%C)
+    )), "\n";
+    print "Password: $C{vnc_password}\n" if defined $C{vnc_password};
 
     return { ssh => $ssh };
 }
 
 sub kill_server {
-    `x11vnc -R stop 2>/dev/null`;
+    my $x11vnc_executable = can_run('x11vnc') or return;
+    system "$x11vnc_executable -R stop 2>/dev/null";
     print "Stopped local X11VNC server instance.\n";
 }
 
+sub pick_window {
+    print "Please select a window to be shared with your mouse!\n";
+    my ($windowid) = `xwininfo` =~ /Window id: (0x[\da-fA-F]+)/;
+    return $windowid;
+}
+
+sub get_current_screen_resolution {
+    my $screeninfo = `xrandr -q`;
+    if (my ($h, $v) = $screeninfo =~ m/current (\d+) x (\d+)/) {
+        return "${h}x${v}";
+    }
+    return undef;
+}
+
+sub make_connection_string {
+    my %C = %{ shift() };
+    return ($C{ssh_user} ?
+        ($C{ssh_password} ?
+            "$C{ssh_user}:$C{ssh_password}\@" : "$C{ssh_user}\@") : '')
+    . $C{ssh_host} . ($C{ssh_port} ? ":$C{ssh_port}" : '');
+}
+
 sub make_client {
-    my ($remote_port, $password, $ssh_options) = @_;
+	my %C = %{ shift() };
 
     # get a random empty port
     my $tunnel_port = empty_port();
 
-    my $ssh = 0;
-    if ($ssh_options->{host} eq 'localhost') {
-        $tunnel_port = $remote_port;
+    my $ssh = undef;
+    if ($C{ssh_host} eq 'localhost') {
+        $tunnel_port = $C{remote_port};
     }
     else {
-        $ssh_options = {
-            %$ssh_options, 
+        print "Establishing SSH tunnel to target machine...\n";
+        $ssh = open_ssh_tunnel(
+        	host 		=> $C{ssh_host},
+            user        => $C{ssh_user},
+        	password 	=> $C{ssh_password},
+        	port 		=> $C{ssh_port},
+        	keyfile 	=> $C{key_file},
+
             # normal tunnel PORT:HOST:X11VNCPORT
             local_port  => $tunnel_port,
             remote_host => 'localhost',
-            remote_port => $remote_port,
-        };
-
-        print "Establishing SSH tunnel to target machine...\n";
-        $ssh = open_ssh_tunnel(%$ssh_options);
+            remote_port => $C{remote_port},
+        );
 
         if ($ssh->error) {
-            croak 'Error connecting to server: ' . $ssh->error . "\n";
+            croak 'Error connecting to server: ' . $ssh->error;
         }
     }
 
     print "Initiating VNC viewer for remote session over localhost:$tunnel_port...\n";
-    `vncviewer localhost:$tunnel_port 2>/dev/null`;
+
+    my $vncviewer_executable = can_run('vncviewer')
+        or croak 'Cannot initiate: vncviewer not installed or not in path.';
+    system "$vncviewer_executable localhost:$tunnel_port 2>/dev/null";
 
     return { ssh => $ssh };
+}
+
+sub random_password {
+	my $length = shift // 8;
+	
+	my $string;
+	$string .= $vnc_password_chars[rand @vnc_password_chars] for 1 .. $length;
+	return $string;
 }
 
 sub open_ssh_tunnel {
@@ -165,10 +227,10 @@ sub ssh_connect {
         ],
         # add other options (if defined)
         map { $options{$_} ? ($_ => $options{$_}) : () }
-            qw(user port),
+            qw(host user port),
     );
 
-    # password if user based, passphrase if using public key
+    # password if user based, passphrase if using key auth
     if ($options{keyfile}) {
         $sshoptions{passphrase} = $options{password};
         $sshoptions{key_path} = $options{keyfile};
@@ -182,7 +244,6 @@ sub ssh_connect {
         if ($options{exitonfwdfail});
 
     my $ssh = Net::OpenSSH->new($options{host}, %sshoptions);
-
     return $ssh;
 }
 
