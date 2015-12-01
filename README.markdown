@@ -7,9 +7,10 @@ a client and the exchange of VNC traffic via that connection.
 
 Usage:
 ```
-crossview [-c] [-s] [-i] [-h|--help] [-v|--version] [-p port]
-    [-d X session] [--password password] [--viewonly]
-    [user[:password]@]host[:port]
+crossview [-c] [-s] [-i] [-h|--help] [-v|--version] [-p PORT_NO]
+	[-d X_DISPLAY] [--password PASSWORD] [--no-pw] [--viewonly]
+	[--pick-window] [-w|--window-id X_WINDOW_ID]
+	[USER[:PASSWORD]@]HOST[:PORT]
 ```
 
 To start the server, specify a display to share and an SSH proxy over which to
@@ -66,15 +67,18 @@ This will open a VNC viewer for viewing and controlling the remote machine A.
 
 | Command-line switch | Description |
 | ------------------- | ----------- |
-| -s | Start in server mode (share a desktop) |
-| -c | Start in client mode (connect to a desktop) |
-| -i | Use public key / passphrase authentication towards the SSH server instead of username/password. |
-| -h, --help | Show program help |
-| -v, --version | Show program version |
+| -s | Start in server mode (share a desktop). |
+| -c | Start in client mode (connect to a desktop). |
+| -i | Use key/passphrase authentication towards the SSH server instead of username/password. |
+| -h, --help | Show program help. |
+| -v, --version | Show program version. |
 | -p | Client mode only. Connect to specified forwarded port on proxy server. To connect to a different SSH port (not 22), use the hostname:port notation when specifying the SSH proxy's address. |
 | -d | Server mode only. Use the specified X session for displaying. The current desktop is usually 0 or 1, but this may vary depending on your settings. |
-| --password | Server mode only. Use the specified password for the VNC session. Provides additional security against people logged into the SSH proxy from viewing other sessions. |
+| --password | Server mode only. Use the specified password for the VNC session. Provides additional security against people logged into the SSH proxy from viewing other sessions. If not specified, a randomly-generated eight-character password will be used. If you do not want a password to be used, use the --no-pw option. |
+| --no-pw | Server mode only. Explicitly run the VNC server without a password. |
 | --viewonly | Server mode only. Specify that a session is to be viewed only, with mouse and keyboard events not propagated to the target host. |
+| --pick-window | Server mode only. Will launch the xwininfo(1) tool for graphically selecting a window to be shared. Remote clients will only be able to see this window. |
+| -w, --window-id | Share only window with the specified Window ID. A Window ID is in hex format like 0xaabbccdd which can be obtained through the use of tools such as xwininfo(1). To choose a window without specifying its ID, see the --pick-window option. |
 
 ## Installation ##
 
@@ -87,6 +91,12 @@ Server mode requirements:
 
 Client mode requirements:
 - vncviewer (eg. TigerVNC)
+
+Optional requirements:
+- Xephyr (for creating a nested X session with --new-x-session), available as:
+  - xserver-xephyr (Ubuntu/Debian)
+  - xorg-x11-server-Xephyr (Red Hat, Fedora)
+  - xorg-server-xephyr (Arch).
 
 ### Installation instructions ###
 
