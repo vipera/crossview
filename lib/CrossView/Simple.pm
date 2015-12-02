@@ -236,7 +236,9 @@ sub make_client {
 
     my $vncviewer_executable = can_run('vncviewer')
         or croak 'Cannot initiate: vncviewer not installed or not in path.';
-    system "$vncviewer_executable localhost:$tunnel_port 2>/dev/null";
+    system "$vncviewer_executable " .
+        ($C{viewonly} ? '-ViewOnly ' : '') .
+        "localhost:$tunnel_port 2>/dev/null";
 
     return { ssh => $ssh };
 }

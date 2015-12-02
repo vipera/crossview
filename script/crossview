@@ -21,6 +21,8 @@ Options:
     -c                Client mode - connect to a remote desktop (default).
     -s                Server mode - allow your desktop to be connected to.
     -i                Identify with key and passphrase when connecting to SSH.
+    --viewonly        Only view desktop. Mouse and keyboard events will not be
+                      propagated to the target display.
     -h, --help        Show program help.
     -v, --version     Show the version number.
 
@@ -41,7 +43,6 @@ Options:
                       --no-pw option.
     --pick-window     Will launch the xwininfo(1) tool for graphically selecting
                       a window to be shared.
-    --viewonly        Only allow viewing of session.
     -w WINDOW_ID      Share only window with the specified Window ID. A Window
                       ID is in hex format like 0xaabbccdd. To choose a window
                       without specifying its ID, see --pick-window.
@@ -233,8 +234,8 @@ information or see the crossview manual page.
 
 --viewonly
 
-    Server mode only. Specify that a session is to be viewed only, with mouse
-    and keyboard events not propagated to the target host.
+    Specify that a session is to be viewed only, with mouse and keyboard events
+    not propagated to the target host.
 
 --pick-window
 

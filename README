@@ -82,8 +82,8 @@ OPTIONS
 
     --viewonly
 
-        Server mode only. Specify that a session is to be viewed only, with mouse
-        and keyboard events not propagated to the target host.
+        Specify that a session is to be viewed only, with mouse and keyboard events
+        not propagated to the target host.
 
     --pick-window
 
