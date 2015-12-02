@@ -10,7 +10,8 @@ use Carp 			qw(carp croak);
 use Exporter 		qw(import);
 use Net::OpenSSH 	qw();
 use Net::EmptyPort 	qw(empty_port check_port);
-use IPC::Cmd        qw(can_run run);
+use IPC::Cmd        qw(can_run run run_forked);
+use IPC::Open3      qw(open3);
 use Data::Dumper;
 
 #our @EXPORT = qw(make_server make_client kill_server); 
@@ -32,6 +33,11 @@ sub make_server {
     # pick window if option was specified, but a concrete window ID wasn't set
     if (!defined $C{windowid} && $C{pickwindow}) {
         $C{windowid} = pick_window();
+    }
+
+    # start a new x session and show it nested with Xephyr
+    if ($C{newxsession}) {
+        $C{display} = open_xephyr_display($C{newxsession});
     }
 
     # start X11 VNC
@@ -141,6 +147,51 @@ sub get_current_screen_resolution {
         return "${h}x${v}";
     }
     return undef;
+}
+
+sub open_xephyr_display {
+    my $x_port = shift;
+
+    my $dbus_launch_executable = can_run('dbus-launch')
+        or croak 'Dbus-launch is unavailable. Could not open Xephyr display.';
+
+    # detect desktop environment
+    my $desktop_executable = undef;
+    if ($ENV{DESKTOP_SESSION}) {
+        # try detecting via this environment variable, which is often unreliable
+        for ($ENV{DESKTOP_SESSION}) {
+            /xfce/      and do { $desktop_executable = 'xfce4-session'; last; };
+            /ubuntu-2d/ and do { $desktop_executable = 'unity-panel'; last; };
+        }
+    }
+    else {
+        # try detecting available IDEs from available executables in path
+        for my $desktop ('gnome-session',  'kded4', 'unity-panel',
+            'xfce4-session', 'cinnamon', 'mate-panel', 'lxsession') {
+            $desktop_executable = can_run($desktop);
+            last if $desktop_executable;
+        }
+    }
+
+    carp 'Cannot detect desktop environment. Will launch empty X session.'
+        unless $desktop_executable;
+
+    my $resolution = get_current_screen_resolution();
+
+    print "Starting Xephyr nested X session...\n";
+    system "Xephyr :$x_port -ac -screen $resolution -br -reset -terminate &>/dev/null &";
+    sleep 1; # some time for Xephyr to start
+
+    if ($desktop_executable) {
+        local $ENV{DISPLAY} = ":$x_port.0";
+        local $ENV{SESSION_MANAGER}; # fix for xfce4-session
+
+        print "Starting $desktop_executable...\n";
+        system "$dbus_launch_executable $desktop_executable &>/dev/null &";
+        sleep 3;
+    }
+
+    return $x_port;
 }
 
 sub make_connection_string {

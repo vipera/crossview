@@ -10,7 +10,7 @@ Usage:
 crossview [-c] [-s] [-i] [-h|--help] [-v|--version] [-p PORT_NO]
 	[-d X_DISPLAY] [--password PASSWORD] [--no-pw] [--viewonly]
 	[--pick-window] [-w|--window-id X_WINDOW_ID]
-	[USER[:PASSWORD]@]HOST[:PORT]
+	[--new-x-session X_DISPLAY] [USER[:PASSWORD]@]HOST[:PORT]
 ```
 
 To start the server, specify a display to share and an SSH proxy over which to
@@ -38,8 +38,8 @@ connecting to X11VNC will be forwarded. Another crossview user connecting to the
 SSH proxy can connect to the session, thereby bypassing any NAT or firewalls
 that would impede a direct connection.
 
-The synopsis above gives a basic working example. Try crossview --help for more
-information or see the CrossView::Simple manual page.
+The synopsis above gives a basic working example. Try `crossview --help` for more
+information or see the crossview manual page.
 
 Let's say there are three machines, A, B and C. B is accessible by both A
 and C, but A is not directly accessible from C or direct access would be
@@ -79,6 +79,7 @@ This will open a VNC viewer for viewing and controlling the remote machine A.
 | --viewonly | Server mode only. Specify that a session is to be viewed only, with mouse and keyboard events not propagated to the target host. |
 | --pick-window | Server mode only. Will launch the xwininfo(1) tool for graphically selecting a window to be shared. Remote clients will only be able to see this window. |
 | -w, --window-id | Share only window with the specified Window ID. A Window ID is in hex format like 0xaabbccdd which can be obtained through the use of tools such as xwininfo(1). To choose a window without specifying its ID, see the --pick-window option. |
+| --new-x-session | Server mode only. Start a new nested X session using Xephyr using the specified port number. The program will try to detect the local desktop environment and launch a session of the same type. The session will be started on the port :DISPLAY. |
 
 ## Installation ##
 

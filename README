@@ -97,6 +97,12 @@ OPTIONS
         xwininfo(1). To choose a window without specifying its ID, see the
         --pick-window option.
 
+    --new-x-session DISPLAY
+
+        Start a new nested X session using Xephyr. The program will try to detect
+        the local desktop environment and launch a session of the same type. The
+        session will be started on the port :DISPLAY.
+
 INSTALLATION
 
     See the INSTALL file for details.

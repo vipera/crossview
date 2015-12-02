@@ -29,6 +29,11 @@ Options:
 
     Server mode options:
     -d SESSION        X session to enable viewing of (usually '0' for current)
+    --new-x-session DISPLAY
+                      Start a new nested X session using Xephyr. The program
+                      will try to detect the local desktop environment and
+                      launch a session of the same type. The session will be
+                      started on the port :DISPLAY.
     --no-pw           Run VNC server without a password.
     --password PASSWD Use specified password for VNC server/client login. If not
                       specified, a random default password will be generated. If
@@ -77,6 +82,7 @@ my %C = (
 	viewonly 		=> undef,
     windowid        => undef,
     pickwindow      => undef,
+    newxsession     => undef,
 );
 
 GetOptions(
@@ -100,7 +106,8 @@ GetOptions(
     },
 	'viewonly',
     'windowid|window-id|window_id|w:s',
-    'pickwindow|pick-window|pick_window'
+    'pickwindow|pick-window|pick_window',
+    'newxsession|new-x-session|new_x_session:i'
 ) or die $help{usage};
 
 unless (@ARGV) {
@@ -240,6 +247,12 @@ information or see the crossview manual page.
     like 0xaabbccdd which can be obtained through the use of tools such as
     xwininfo(1). To choose a window without specifying its ID, see the
     --pick-window option.
+
+--new-x-session DISPLAY
+
+    Start a new nested X session using Xephyr. The program will try to detect
+    the local desktop environment and launch a session of the same type. The
+    session will be started on the port :DISPLAY.
 
 =head1 INSTALLATION
 
