@@ -157,6 +157,20 @@ sub get_current_screen_resolution {
     return undef;
 }
 
+sub run_in_background {
+    my $command = shift;
+
+    # double fork
+    my $pid;
+    unless ($pid = fork) {
+        unless (fork) {
+            run3 $command, \undef, \undef, \undef;
+        }
+        exit 0;
+    }
+    waitpid($pid, 0);
+}
+
 sub open_xephyr_display {
     my $x_port = shift;
 
@@ -186,8 +200,20 @@ sub open_xephyr_display {
 
     my $resolution = get_current_screen_resolution();
 
+    my $xephyr_executable = can_run('Xephyr')
+        or carp 'Cannot nest X session: Xephyr not available in path.';
+
     print "Starting Xephyr nested X session...\n";
-    system "Xephyr :$x_port -ac -screen $resolution -br -reset -terminate &>/dev/null &";
+    #system "Xephyr :$x_port -ac -screen $resolution -br -reset -terminate &>/dev/null &";
+    run_in_background [
+        $xephyr_executable,
+        ":$x_port",
+        '-ac',
+        '-screen', $resolution,
+        '-br',
+        '-reset',
+        '-terminate'
+    ];
     sleep 1; # some time for Xephyr to start
 
     if ($desktop_executable) {
@@ -195,7 +221,11 @@ sub open_xephyr_display {
         local $ENV{SESSION_MANAGER}; # fix for xfce4-session
 
         print "Starting $desktop_executable...\n";
-        system "$dbus_launch_executable $desktop_executable &>/dev/null &";
+        #system "$dbus_launch_executable $desktop_executable &>/dev/null &";
+        run_in_background [
+            $dbus_launch_executable,
+            $desktop_executable
+        ];
         sleep 3;
     }
 
