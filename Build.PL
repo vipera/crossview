@@ -20,13 +20,14 @@ my $build = Module::Build->new(
     dist_author => 'Marin Rukavina <marin@shinyshell.net>',
     license => 'bsd',
     requires => {
-        'perl' => '5.6.1',
+        'perl'               => '5.6.1',
 
         'Term::ReadPassword' => 0,
-        'Net::OpenSSH' => 0,
-        'Net::EmptyPort' => 0,
+        'Net::OpenSSH'       => 0,
+        'Net::EmptyPort'     => 0,
+        'IPC::Run3'          => 0,
 
-        'IO::Pty' => 0,
+        'IO::Pty'            => 0,
     },
     script_files => [ qw(script/crossview) ],
 );

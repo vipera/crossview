@@ -6,13 +6,13 @@ package CrossView::Simple;
 use warnings;
 use strict;
 
-use Carp 			qw(carp croak);
-use Exporter 		qw(import);
-use Net::OpenSSH 	qw();
-use Net::EmptyPort 	qw(empty_port check_port);
-use IPC::Cmd        qw(can_run run run_forked);
-use IPC::Open3      qw(open3);
-use Data::Dumper;
+use Carp           qw(carp croak);
+use Exporter       qw(import);
+use Net::OpenSSH   qw();
+use Net::EmptyPort qw(empty_port check_port);
+use IPC::Cmd       qw(can_run run run_forked);
+use IPC::Run3      qw(run3);
+use Data::Dumper   qw(Dumper);
 
 #our @EXPORT = qw(make_server make_client kill_server); 
 our @EXPORT_OK = qw(
@@ -25,7 +25,7 @@ our $VERSION = '0.02';
 our @vnc_password_chars = ('A'..'Z', 'a'..'z', '1'..'9');
 
 sub make_server {
-	my %C = %{ shift() };
+    my %C = %{ shift() };
 
     my $x11vnc_executable = can_run('x11vnc')
         or croak 'X11VNC is not installed.';
@@ -41,15 +41,23 @@ sub make_server {
     }
 
     # start X11 VNC
-    my $x11vnc_command = "$x11vnc_executable " .
-        ($C{viewonly} ? '-viewonly ' : '') .
-        ($C{vnc_password} ? "-passwd $C{vnc_password} " : '-nopw ') .
-        '-nap -bg -forever -noxdamage -nolookup ' .
-        qq(-desktop "VNC \${USER}@\${HOSTNAME}" ) .
-        (defined $C{windowid} ? "-id $C{windowid} " : '') .
-        "-display :$C{display} 2>/dev/null";
+    my @x11vnc_command = grep defined, (
+        $x11vnc_executable,
+        '-nap',
+        '-bg',
+        '-forever',
+        '-noxdamage',
+        '-nolookup',
+        '-desktop', '"VNC ${USER}@${HOSTNAME}"',
+        $C{viewonly} ? '-viewonly' : undef,
+        $C{vnc_password} ? ('-passwd', $C{vnc_password}) : '-nopw',
+        defined $C{windowid} ? ('-id', $C{windowid}) : undef,
+        "-display", ":$C{display}"
+    );
 
-    my $x11vnc_output = `$x11vnc_command`;
+    my $x11vnc_output;
+    run3 \@x11vnc_command, \undef, \$x11vnc_output, \undef;
+    
     my ($x11vnc_port) = $x11vnc_output =~ m/([0-9]{4})/;
     croak 'Unable to start X11VNC.' unless ($x11vnc_port);
 
@@ -65,11 +73,11 @@ sub make_server {
             # TODO: apparently ExitOnForwardFailure doesn't work on localhost
             # tunnels. This is ugly, see if there's a better way.
             my $try_ssh = ssh_connect(
-            	host 		=> $C{ssh_host},
-                user        => $C{ssh_user},
-            	password 	=> $C{ssh_password},
-            	port 		=> $C{ssh_port},
-            	keyfile 	=> $C{key_file}
+                host     => $C{ssh_host},
+                user     => $C{ssh_user},
+                password => $C{ssh_password},
+                port     => $C{ssh_port},
+                keyfile  => $C{key_file}
             );
             if (!$try_ssh || $try_ssh->error) {
                 $ssh = $try_ssh;
@@ -81,20 +89,20 @@ sub make_server {
 
             # establish tunnel
             $ssh = open_ssh_tunnel(
-            	host 			=> $C{ssh_host},
-                user            => $C{ssh_user},
-	        	password 		=> $C{ssh_password},
-	        	port 			=> $C{ssh_port},
-	        	keyfile 		=> $C{key_file},
-	            
-	            # don't allow connection if port is used
-	            exitonfwdfail 	=> 1,
+                host     => $C{ssh_host},
+                user     => $C{ssh_user},
+                password => $C{ssh_password},
+                port     => $C{ssh_port},
+                keyfile  => $C{key_file},
+                
+                # don't allow connection if port is used
+                exitonfwdfail     => 1,
 
-	            # reverse tunnel PORT:HOST:X11VNCPORT
-	            reverse 		=> 1,
-	            local_port 		=> $tunnel_port,
-	            remote_host 	=> 'localhost',
-	            remote_port 	=> $x11vnc_port,
+                # reverse tunnel PORT:HOST:X11VNCPORT
+                reverse     => 1,
+                local_port  => $tunnel_port,
+                remote_host => 'localhost',
+                remote_port => $x11vnc_port,
             );
 
             # break if error isn't 'port already used', otherwise try next port
@@ -104,8 +112,8 @@ sub make_server {
         }
 
         if ($tunnel_port > $tunnel_max_port) {
-        	croak 'Could not open port on proxy at this time - max number of ' .
-        		'connections established.';
+            croak 'Could not open port on proxy at this time - max number of ' .
+                'connections established.';
         }
 
         if (!$ssh || $ssh->error) {
@@ -131,7 +139,7 @@ sub make_server {
 
 sub kill_server {
     my $x11vnc_executable = can_run('x11vnc') or return;
-    system "$x11vnc_executable -R stop 2>/dev/null";
+    run3 [$x11vnc_executable, '-R', 'stop'], \undef, \undef, \undef;
     print "Stopped local X11VNC server instance.\n";
 }
 
@@ -203,7 +211,7 @@ sub make_connection_string {
 }
 
 sub make_client {
-	my %C = %{ shift() };
+    my %C = %{ shift() };
 
     # get a random empty port
     my $tunnel_port = empty_port();
@@ -215,11 +223,11 @@ sub make_client {
     else {
         print "Establishing SSH tunnel to target machine...\n";
         $ssh = open_ssh_tunnel(
-        	host 		=> $C{ssh_host},
+            host        => $C{ssh_host},
             user        => $C{ssh_user},
-        	password 	=> $C{ssh_password},
-        	port 		=> $C{ssh_port},
-        	keyfile 	=> $C{key_file},
+            password    => $C{ssh_password},
+            port        => $C{ssh_port},
+            keyfile     => $C{key_file},
 
             # normal tunnel PORT:HOST:X11VNCPORT
             local_port  => $tunnel_port,
@@ -236,19 +244,23 @@ sub make_client {
 
     my $vncviewer_executable = can_run('vncviewer')
         or croak 'Cannot initiate: vncviewer not installed or not in path.';
-    system "$vncviewer_executable " .
-        ($C{viewonly} ? '-ViewOnly ' : '') .
-        "localhost:$tunnel_port 2>/dev/null";
+
+    my @vncviewer_command = grep defined, (
+        $vncviewer_executable,
+        $C{viewonly} ? '-ViewOnly' : undef,
+        "localhost:$tunnel_port"
+    );
+    run3 \@vncviewer_command, \undef, \undef, \undef;
 
     return { ssh => $ssh };
 }
 
 sub random_password {
-	my $length = shift // 8;
-	
-	my $string;
-	$string .= $vnc_password_chars[rand @vnc_password_chars] for 1 .. $length;
-	return $string;
+    my $length = shift // 8;
+    
+    my $string;
+    $string .= $vnc_password_chars[rand @vnc_password_chars] for 1 .. $length;
+    return $string;
 }
 
 sub open_ssh_tunnel {
@@ -270,8 +282,8 @@ sub ssh_connect {
 
     my %sshoptions = (
         strict_mode => 0,
-        batch_mode => 1,
-        timeout => 30,
+        batch_mode  => 1,
+        timeout     => 30,
         master_opts => [
             # allow proxy to be unknown host
             '-o' => 'StrictHostKeyChecking=no',
