@@ -82,8 +82,8 @@ OPTIONS
 
     --viewonly
 
-        Server mode only. Specify that a session is to be viewed only, with mouse
-        and keyboard events not propagated to the target host.
+        Specify that a session is to be viewed only, with mouse and keyboard events
+        not propagated to the target host.
 
     --pick-window
 
@@ -96,6 +96,12 @@ OPTIONS
         like 0xaabbccdd which can be obtained through the use of tools such as
         xwininfo(1). To choose a window without specifying its ID, see the
         --pick-window option.
+
+    --new-x-session DISPLAY
+
+        Start a new nested X session using Xephyr. The program will try to detect
+        the local desktop environment and launch a session of the same type. The
+        session will be started on the port :DISPLAY.
 
 INSTALLATION
 

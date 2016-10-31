@@ -2,10 +2,10 @@
 use warnings;
 use strict;
 
-use Getopt::Long		qw(GetOptions);
-use Term::ReadPassword 	qw(read_password);
-use FindBin 			qw($Bin);
-use lib 				"$Bin/../lib";
+use Getopt::Long       qw(GetOptions);
+use Term::ReadPassword qw(read_password);
+use FindBin            qw($Bin);
+use lib                "$Bin/../lib";
 
 use CrossView::Simple qw(
     make_server make_client
@@ -21,6 +21,8 @@ Options:
     -c                Client mode - connect to a remote desktop (default).
     -s                Server mode - allow your desktop to be connected to.
     -i                Identify with key and passphrase when connecting to SSH.
+    --viewonly        Only view desktop. Mouse and keyboard events will not be
+                      propagated to the target display.
     -h, --help        Show program help.
     -v, --version     Show the version number.
 
@@ -29,6 +31,11 @@ Options:
 
     Server mode options:
     -d SESSION        X session to enable viewing of (usually '0' for current)
+    --new-x-session DISPLAY
+                      Start a new nested X session using Xephyr. The program
+                      will try to detect the local desktop environment and
+                      launch a session of the same type. The session will be
+                      started on the port :DISPLAY.
     --no-pw           Run VNC server without a password.
     --password PASSWD Use specified password for VNC server/client login. If not
                       specified, a random default password will be generated. If
@@ -36,7 +43,6 @@ Options:
                       --no-pw option.
     --pick-window     Will launch the xwininfo(1) tool for graphically selecting
                       a window to be shared.
-    --viewonly        Only allow viewing of session.
     -w WINDOW_ID      Share only window with the specified Window ID. A Window
                       ID is in hex format like 0xaabbccdd. To choose a window
                       without specifying its ID, see --pick-window.
@@ -66,41 +72,43 @@ EOH
 
 # app config
 my %C = (
-	server_mode 	=> undef,
-	client_mode 	=> undef,
-	remote_port 	=> undef,
-	display 		=> 0,
-	key_file 		=> undef,
-	help 			=> undef,
-	version 		=> undef,
-	vnc_password 	=> undef,
-	viewonly 		=> undef,
-    windowid        => undef,
-    pickwindow      => undef,
+    server_mode  => undef,
+    client_mode  => undef,
+    remote_port  => undef,
+    display      => 0,
+    key_file     => undef,
+    help         => undef,
+    version      => undef,
+    vnc_password => undef,
+    viewonly     => undef,
+    windowid     => undef,
+    pickwindow   => undef,
+    newxsession  => undef,
 );
 
 GetOptions(
-	\%C,
-	'server_mode|server-mode|server|s',
-	'client_mode|client-mode|client|c',
-	'remote_port|remote-port|port|p:i',
-	'display|d:i',
-	'key_file|key-file|i',
-	'help|h' => sub {
+    \%C,
+    'server_mode|server-mode|server|s',
+    'client_mode|client-mode|client|c',
+    'remote_port|remote-port|port|p:i',
+    'display|d:i',
+    'key_file|key-file|i',
+    'help|h' => sub {
         print $help{usage}, "\n", $help{help};
         exit;
     },
-	'version|v' => sub {
+    'version|v' => sub {
         print ((split /\n/, $help{usage})[0], "\n");
         exit;
     },
-	'vnc_password|vnc-password|password:s',
-    'no_pw|no-pw|nopw' => sub {
+    'vnc_password|vnc-password|password:s',
+    'nopw|no-pw|no_pw|nopassword|no-password|no_password' => sub {
         $C{vnc_password} = '';
     },
-	'viewonly',
+    'viewonly|view-only|view_only',
     'windowid|window-id|window_id|w:s',
-    'pickwindow|pick-window|pick_window'
+    'pickwindow|pick-window|pick_window',
+    'newxsession|new-x-session|new_x_session:i'
 ) or die $help{usage};
 
 unless (@ARGV) {
@@ -140,6 +148,7 @@ else {
     $connection = make_client(\%C);
 }
 
+__END__
 =pod
 
 =head1 NAME
@@ -226,8 +235,8 @@ information or see the crossview manual page.
 
 --viewonly
 
-    Server mode only. Specify that a session is to be viewed only, with mouse
-    and keyboard events not propagated to the target host.
+    Specify that a session is to be viewed only, with mouse and keyboard events
+    not propagated to the target host.
 
 --pick-window
 
@@ -240,6 +249,12 @@ information or see the crossview manual page.
     like 0xaabbccdd which can be obtained through the use of tools such as
     xwininfo(1). To choose a window without specifying its ID, see the
     --pick-window option.
+
+--new-x-session DISPLAY
+
+    Start a new nested X session using Xephyr. The program will try to detect
+    the local desktop environment and launch a session of the same type. The
+    session will be started on the port :DISPLAY.
 
 =head1 INSTALLATION
 
