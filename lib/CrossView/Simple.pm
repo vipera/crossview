@@ -14,7 +14,7 @@ use IPC::Cmd       qw(can_run run run_forked);
 use IPC::Run3      qw(run3);
 use Data::Dumper   qw(Dumper);
 
-#our @EXPORT = qw(make_server make_client kill_server); 
+#our @EXPORT = qw(make_server make_client kill_server);
 our @EXPORT_OK = qw(
     make_server make_client
     kill_server
@@ -57,15 +57,15 @@ sub make_server {
 
     my $x11vnc_output;
     run3 \@x11vnc_command, \undef, \$x11vnc_output, \undef;
-    
+
     my ($x11vnc_port) = $x11vnc_output =~ m/([0-9]{4})/;
     croak 'Unable to start X11VNC.' unless ($x11vnc_port);
 
     print "Started X11VNC server at localhost:$x11vnc_port\n";
-    
+
     my $ssh = undef;
     my ($tunnel_port, $tunnel_max_port) = (9000, 10000); # port on proxy machine
-    
+
     # do not do SSH if target host is localhost (no proxy used)
     unless ($C{ssh_host} eq 'localhost') {
         print "Establishing SSH tunnel to remote machine...\n";
@@ -94,7 +94,7 @@ sub make_server {
                 password => $C{ssh_password},
                 port     => $C{ssh_port},
                 keyfile  => $C{key_file},
-                
+
                 # don't allow connection if port is used
                 exitonfwdfail     => 1,
 
@@ -130,7 +130,7 @@ sub make_server {
         defined $C{vnc_password} ? "--password $C{vnc_password}" : '',
         $C{ssh_host} eq 'localhost' ?
             'SSH_USER@THIS_HOST' :
-            make_connection_string(\%C)
+            'SSH_USER@' . $C{ssh_host} . ($C{ssh_port} ? ":$C{ssh_port}" : '')
     )), "\n";
     print "Password: $C{vnc_password}\n" if defined $C{vnc_password};
 
@@ -287,7 +287,7 @@ sub make_client {
 
 sub random_password {
     my $length = shift // 8;
-    
+
     my $string;
     $string .= $vnc_password_chars[rand @vnc_password_chars] for 1 .. $length;
     return $string;
