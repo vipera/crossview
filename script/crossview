@@ -92,7 +92,7 @@ GetOptions(
     'client_mode|client-mode|client|c',
     'remote_port|remote-port|port|p:i',
     'display|d:i',
-    'key_file|key-file|i',
+    'key_file|key-file|i:s',
     'help|h' => sub {
         print $help{usage}, "\n", $help{help};
         exit;
